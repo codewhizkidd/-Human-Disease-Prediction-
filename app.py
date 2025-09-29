@@ -93,7 +93,7 @@ if(selected=="about"):
     st.markdown("""
                 ## 🏥 About This Web Application
                 
-                This Web Application is created by **Shayan siddiqui** to assist in disease prediction using machine learning models trained on various medical datasets. 
+                This Web Application is created by **CODEWHIZZKID** to assist in disease prediction using machine learning models trained on various medical datasets. 
                 The application is designed to provide **accurate** 🧠 and **efficient** ⏳ predictions for different diseases based on patient data, enhancing early diagnosis and decision-making.
 
                 ### 📊 About the Dataset
@@ -125,12 +125,12 @@ if(selected=="about"):
 
 #developer 
 if(selected=="developer"):
-    st.title("About Shayan siddiqui 👨‍💻")
+    st.title("About Humaira Saifee 👨‍💻")
     st.header("Your AI & ML Engineer")
     
     st.subheader("Meet the Developer")
     st.write("""
-    Hello, I'm **Shayan siddiqui**, your AI and Machine Learning Engineer with 1 years of experience in the field. I am passionate about harnessing the power of technology to make a positive impact on people's lives. Allow me to share a bit about my journey in the world of artificial intelligence and machine learning.
+    Hello, I'm **Humaira Saifee**, your AI and Machine Learning Engineer with 1 years of experience in the field. I am passionate about harnessing the power of technology to make a positive impact on people's lives. Allow me to share a bit about my journey in the world of artificial intelligence and machine learning.
     """)
 
     st.subheader("My Expertise")
@@ -167,8 +167,8 @@ if(selected=="contact us"):
     st.write("""
     Feel free to reach out to us via email or through the contact form below. We value your feedback and are committed to providing you with the best possible experience.
     """)
-    st.markdown("📧 **Email:** shayansiddiqui7838@gmail.com")
-    st.markdown("📞 **Phone:** 7838224786")
+    st.markdown("📧 **Email:** humairasaifee25@gmail.com")
+    st.markdown("📞 **Phone:** 9152858705")
 
     st.subheader("Stay Connected")
     st.write("""
@@ -176,7 +176,7 @@ if(selected=="contact us"):
     """)
 
     st.subheader("📍 Location")
-    st.write("South Delhi, New Delhi - 110019")
+    st.write("Mumbai, Maharashtra - 400050")
 
 
 
@@ -417,4 +417,3 @@ if selected == 'Exit':
         """,
         unsafe_allow_html=True
     )
-
