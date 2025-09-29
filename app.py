@@ -43,7 +43,9 @@ if(selected=='Home'):
     
     #page title
     st.title('HUMAN MULTIPLE DISEASE DETECTION SYSTEM')
-    #st.image("C:\Users\Shayan\OneDrive\Desktop\Multiple_Disease_Prediction-main\healthcare.jpg")
+    #st.image("C:\Users
+    
+    \OneDrive\Desktop\Multiple_Disease_Prediction-main\healthcare.jpg")
     st.markdown("""
     # Welcome to the Human Multiple Disease Detection System! 🔍
                 
@@ -417,3 +419,4 @@ if selected == 'Exit':
         """,
         unsafe_allow_html=True
     )
+
