@@ -625,7 +625,6 @@ if selected == "Kidney Disease Prediction":
         else:
             st.success("✅ All input parameters are within optimal range!")
 
-        st.success(f"The person is {'Kidney Disease' if kidney_prediction[0] == 1 else 'Healthy Kidney'}")
         show_nearby_doctors("kidney disease")
 
 
