@@ -560,7 +560,7 @@ if selected == "Heart Disease Prediction":
         else:
             st.success("✅ All input parameters are within optimal range!")
         
-        st.success(f"The person is {'Heart Disease' if heart_prediction[0] == 1 else 'Healthy Heart'}")
+        
         show_nearby_doctors("heart disease")
 
 
