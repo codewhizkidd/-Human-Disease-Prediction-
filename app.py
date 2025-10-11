@@ -11,6 +11,18 @@ import json
 import geocoder
 import requests
 
+import streamlit as st
+
+def highlight_out_of_range(value, min_val, max_val, label):
+    """Highlights if parameter is outside normal range."""
+    if value < min_val or value > max_val:
+        st.markdown(f"**{label}:** `{value}` ❌ *(Out of range)*", unsafe_allow_html=True)
+        return "out"
+    else:
+        st.markdown(f"**{label}:** `{value}` ✅ *(Normal)*", unsafe_allow_html=True)
+        return "in"
+
+
 # ----------------------- Page Config -----------------------
 st.set_page_config(
     page_title="Multiple Disease Prediction",
@@ -71,9 +83,10 @@ def verify_password(password_plaintext, hashed_str):
     return bcrypt.checkpw(password_plaintext.encode('utf-8'), hashed_str.encode('utf-8'))
 
 # ----------------------- Load ML Models -----------------------
-diabetes_model = pickle.load(open(r'C:\Users\rajsh\OneDrive\Documents\Multi Desease Prediction\-Human-Disease-Prediction-\diabetes.pkl', 'rb'))
-heart_disease_model = pickle.load(open(r'C:\Users\rajsh\OneDrive\Documents\Multi Desease Prediction\-Human-Disease-Prediction-\heart.pkl', 'rb'))
-kidney_disease_model = pickle.load(open(r'C:\Users\rajsh\OneDrive\Documents\Multi Desease Prediction\-Human-Disease-Prediction-\kidney.pkl', 'rb'))
+diabetes_model = pickle.load(open('diabetes.pkl', 'rb'))
+
+heart_disease_model = pickle.load(open('heart.pkl', 'rb'))
+kidney_disease_model = pickle.load(open('kidney.pkl', 'rb'))
 # ----------------------- Custom CSS -----------------------
 page_bg_color = """
 <style>
@@ -384,7 +397,7 @@ if selected == "Developer":
     <ul>
         <li><b>Zaara Khan:</b> Full Stack Developer, responsible for prediction models deployment and API integration. <br>Email: zaarakhn07@eng.rizvi.edu.in</li>
         <li><b>Anshika Shukla:</b> Frontend & UI/UX Developer, worked on Streamlit interface and visualization. <br>Email: shuklaanshika@eng.rizvi.edu.in</li>
-        <li><b>Sakshi Jha:</b> Backend & Database Developer, responsible for SQLite integration and user management. <br>Email: jhasakshi18@eng.rizvi.edu.in</li>
+        <li><b>Sakshi Jha:</b> Full Stack Developer, responsible for SQLite integration and user management. <br>Email: jhasakshi18@eng.rizvi.edu.in</li>
         <li><b>Humaira Saifee:</b> Lead AI & ML Engineer, specialized in healthcare predictive models. <br>Email: humairasaifee25@gmail.com</li>
     </ul>
     </div>
@@ -438,6 +451,14 @@ if selected == "Diabetes Prediction":
         result = "Diabetic" if prediction[0] == 1 else "Non-Diabetic"
         st.success(f"The person is {result}")
 
+        # Highlight section 
+        st.subheader("Health Parameter Check 🔍")
+        highlight_out_of_range(Glucose, 70, 140, "Glucose Level")
+        highlight_out_of_range(BloodPressure, 80, 120, "Blood Pressure")
+        highlight_out_of_range(BMI, 18.5, 24.9, "BMI")
+        highlight_out_of_range(Age, 18, 60, "Age")
+
+
 # ----------------------- Heart Disease -----------------------
 if selected == "Heart Disease Prediction":
     check_login()
@@ -463,6 +484,31 @@ if selected == "Heart Disease Prediction":
         prediction = heart_disease_model.predict([input_data])
         result = "Heart Disease" if prediction[0] == 1 else "No Heart Disease"
         st.success(f"The person has {result}")
+
+        # Highlight abnormal heart parameters
+        abnormal_params = []
+
+        if age > 50:
+            abnormal_params.append("Age (High)")
+        if trestbps > 140:
+            abnormal_params.append("Resting Blood Pressure (High)")
+        if chol > 240:
+            abnormal_params.append("Cholesterol (High)")
+        if fbs == 1:
+            abnormal_params.append("Fasting Blood Sugar (High)")
+        if thalach < 100:
+            abnormal_params.append("Maximum Heart Rate (Low)")
+        if oldpeak > 2:
+            abnormal_params.append("ST Depression (High)")
+
+        if abnormal_params:
+            st.warning("⚠️ Parameters out of optimal range:")
+            for param in abnormal_params:
+                st.write(f"- {param}")
+        else:
+            st.success("✅ All input parameters are within optimal range!")
+
+
 
 # ----------------------- Kidney Disease -----------------------
 if selected == "Kidney Disease Prediction":
@@ -498,6 +544,32 @@ if selected == "Kidney Disease Prediction":
         prediction = kidney_disease_model.predict([input_data])
         result = "Kidney Disease" if prediction[0] == 1 else "No Kidney Disease"
         st.success(f"The person has {result}")
+
+        # Highlight abnormal kidney parameters
+        abnormal_params = []
+
+        if user_inputs[1] > 140:
+            abnormal_params.append("Blood Pressure (High)")
+        if user_inputs[2] < 1.005:
+            abnormal_params.append("Specific Gravity (Low)")
+        if user_inputs[3] > 4:
+            abnormal_params.append("Albumin (High)")
+        if user_inputs[4] > 3:
+            abnormal_params.append("Sugar (High)")
+        if user_inputs[11] > 1.5:
+            abnormal_params.append("Serum Creatinine (High)")
+        if user_inputs[10] > 40:
+            abnormal_params.append("Blood Urea (High)")
+        if user_inputs[14] < 12:
+            abnormal_params.append("Hemoglobin (Low)")
+
+        if abnormal_params:
+            st.warning("⚠️ Parameters out of optimal range:")
+            for param in abnormal_params:
+                st.write(f"- {param}")
+        else:
+            st.success("✅ All input parameters are within optimal range!")
+
 
 # ----------------------- Nearby Doctors & Precautions -----------------------
 if selected == "Nearby Doctors & Precautions":
