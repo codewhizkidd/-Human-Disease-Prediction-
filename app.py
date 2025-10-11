@@ -1,422 +1,608 @@
-import streamlit as st 
-import pickle 
-import os
+import streamlit as st
+import pickle
+import sqlite3
+import bcrypt
 from streamlit_option_menu import option_menu
+from sklearn.preprocessing import PolynomialFeatures
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import json
+import geocoder
+import requests
 
-st.set_page_config(page_title="Mulitple Disease Prediction",layout="wide", page_icon="👨‍🦰🤶")
+# ----------------------- Page Config -----------------------
+st.set_page_config(
+    page_title="Multiple Disease Prediction",
+    layout="wide",
+    page_icon="🩺"
+)
 
-working_dir = os.path.dirname(os.path.abspath(__file__))
+# ----------------------- Session State -----------------------
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+    st.session_state['username'] = ""
+
+# ----------------------- Database Setup -----------------------
+conn = sqlite3.connect('user_data.db', check_same_thread=False)
+c = conn.cursor()
+
+# users table
+c.execute('''
+CREATE TABLE IF NOT EXISTS users (
+    username TEXT PRIMARY KEY,
+    password TEXT
+)
+''')
+
+# user activity + predictions tables
+c.execute('''
+CREATE TABLE IF NOT EXISTS user_activity (
+    username TEXT,
+    activity_type TEXT,
+    result TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+''')
+
+c.execute('''
+CREATE TABLE IF NOT EXISTS predictions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT,
+    disease_type TEXT,
+    result TEXT,
+    input_json TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+''')
+conn.commit()
+
+# ----------------------- User Functions -----------------------
+def get_user(username):
+    c.execute('SELECT username, password FROM users WHERE username = ?', (username,))
+    return c.fetchone()
+
+def add_user(username, password_plaintext):
+    hashed = bcrypt.hashpw(password_plaintext.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    c.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hashed))
+    conn.commit()
+
+def verify_password(password_plaintext, hashed_str):
+    return bcrypt.checkpw(password_plaintext.encode('utf-8'), hashed_str.encode('utf-8'))
+
+# ----------------------- Load ML Models -----------------------
+diabetes_model = pickle.load(open(r'C:\Users\rajsh\OneDrive\Documents\Multi Desease Prediction\-Human-Disease-Prediction-\diabetes.pkl', 'rb'))
+heart_disease_model = pickle.load(open(r'C:\Users\rajsh\OneDrive\Documents\Multi Desease Prediction\-Human-Disease-Prediction-\heart.pkl', 'rb'))
+kidney_disease_model = pickle.load(open(r'C:\Users\rajsh\OneDrive\Documents\Multi Desease Prediction\-Human-Disease-Prediction-\kidney.pkl', 'rb'))
+# ----------------------- Custom CSS -----------------------
+page_bg_color = """
+<style>
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Poppins:wght@600;700&display=swap');
+
+/* ------------------- Main App Background ------------------- */
+.stApp {
+    background: linear-gradient(135deg, #c3ecff 0%, #b3f0ff 100%);
+    color: #1a1a1a;
+    font-family: 'Roboto', sans-serif;
+    transition: all 0.5s ease;
+}
+
+/* ------------------- Headings ------------------- */
+h1, h2, h3, h4, h5, h6 {
+    color: #0d1a26;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+/* ------------------- Card Layout ------------------- */
+.card {
+    background: #ffffff;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 15px 0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+/* ------------------- Fade-in Animation ------------------- */
+.fade-in {
+    opacity: 0;
+    animation: fadeIn 0.7s ease forwards;
+}
+@keyframes fadeIn {
+    from { opacity:0; transform: translateY(20px); }
+    to { opacity:1; transform: translateY(0); }
+}
+
+/* ------------------- Typing Animation ------------------- */
+.typing {
+  display: inline-block;
+  border-right: 2px solid #0077b6;
+  white-space: nowrap;
+  overflow: hidden;
+  animation: typing 2s steps(40, end), blink-caret 0.75s step-end infinite;
+}
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+@keyframes blink-caret {
+  50% { border-color: transparent; }
+}
+
+/* ------------------- Labels above input ------------------- */
+.stNumberInput label, .stTextInput label {
+    display: block !important;
+    color: #003366 !important;
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+    padding-bottom: 4px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+/* ------------------- Input Boxes ------------------- */
+.stTextInput > div > div > input,
+.stNumberInput > div > div > input {
+    color: #333333 !important;
+    background-color: #e0f7fa !important;
+    border: 1px solid #0099cc !important;
+    border-radius: 10px !important;
+    padding: 8px;
+    font-weight: 500;
+    font-family: 'Roboto', sans-serif;
+    transition: all 0.3s ease-in-out;
+}
+.stTextInput > div > div > input:focus,
+.stNumberInput > div > div > input:focus {
+    border: 2px solid #0077b6 !important;
+    box-shadow: 0 0 8px rgba(0,119,182,0.3);
+    transform: scale(1.02);
+}
+
+/* ------------------- Buttons ------------------- */
+.stButton > button {
+    background-color: #0077b6 !important;
+    color: white !important;
+    font-weight: 700 !important;
+    border-radius: 14px !important;
+    padding: 10px 20px !important;
+    font-family: 'Poppins', sans-serif;
+    transition: all 0.3s ease-in-out;
+}
+.stButton > button:hover {
+    background-color: #0096c7 !important;
+    transform: scale(1.05) translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,119,182,0.3);
+}
+
+/* ------------------- Sidebar ------------------- */
+.css-1d391kg {  
+    background-color: #e6f2ff !important;
+    font-family: 'Roboto', sans-serif;
+}
+.css-1v3fvcr {
+    font-weight: 700 !important;
+    font-size: 1.15rem !important;
+}
+.css-1d391kg .nav-item:hover {
+    background-color: #0099cc;
+    color: white;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+
+/* ------------------- Tables / DataFrames ------------------- */
+.stDataFrame, .css-1lcbmhc {
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.95rem;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* ------------------- Alerts / Warnings ------------------- */
+.stAlert {
+    border-radius: 12px;
+    font-weight: 600;
+    padding: 8px;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* ------------------- Horizontal line ------------------- */
+hr {
+    border: 1px solid #0099cc;
+}
+
+/* ------------------- Selectbox / Dropdown ------------------- */
+.css-1wy0on6 {
+    font-family: 'Roboto', sans-serif;
+    color: #003366;
+    transition: all 0.3s ease;
+}
+.css-1wy0on6:hover {
+    transform: scale(1.02);
+}
+
+/* ------------------- Text Highlight on Hover ------------------- */
+p:hover, li:hover, h4:hover, h5:hover {
+    color: #0077b6;
+    transition: 0.3s ease;
+}
+</style>
+"""
+st.markdown(page_bg_color, unsafe_allow_html=True)
 
 
-diabetes_model = pickle.load(open(f'{working_dir}/saved_models/diabetes.pkl','rb'))
-heart_disease_model = pickle.load(open(f'{working_dir}/saved_models/heart.pkl','rb'))
-kidney_disease_model = pickle.load(open(f'{working_dir}/saved_models/kindey.pkl','rb'))
 
-NewBMI_Overweight=0
-NewBMI_Underweight=0
-NewBMI_Obesity_1=0
-NewBMI_Obesity_2=0 
-NewBMI_Obesity_3=0
-NewInsulinScore_Normal=0 
-NewGlucose_Low=0
-NewGlucose_Normal=0 
-NewGlucose_Overweight=0
-NewGlucose_Secret=0
-
+# ----------------------- Sidebar -----------------------
 with st.sidebar:
-    selected = option_menu("Mulitple Disease Prediction", 
-                ['Home',
-                'Diabetes Prediction',
-                 'Heart Disease Prediction',
-                 'Kidney Disease Prediction',
-                 'about',
-                 'developer',
-                 'contact us',
-                 'Exit'],
-                 menu_icon='hospital-fill',
-                 icons=['house','activity','heart', 'person' , 'info-circle', 'person-circle', 'envelope', 'x-circle'],
-                 default_index=0)
-    
-
-# ---------------------- Home Section ---------------------- #
-if(selected=='Home'):
-    
-    #page title
-    st.title('HUMAN MULTIPLE DISEASE DETECTION SYSTEM')
-    #st.image("C:\Users
-    
-    \OneDrive\Desktop\Multiple_Disease_Prediction-main\healthcare.jpg")
-    st.markdown("""
-    # Welcome to the Human Multiple Disease Detection System! 🔍
-                
-    Your health matters, and early detection can make all the difference. Many diseases progress silently, and timely detection can lead to more effective treatment. Our system is designed to assist in identifying multiple human diseases efficiently using **state-of-the-art machine learning techniques**. With just a few simple steps, you can analyze medical data and gain valuable insights into potential health risks.
-
-    This AI-powered system utilizes deep learning and advanced medical data analysis techniques to help users detect diseases early, providing a **fast, reliable, and user-friendly experience**.
-
-    ---
-    
-    ## How It Works ⚙️
-    1. **Provide Health Information:** Navigate to the **Any Disease Recognition** page and input the relevant test data for the suspected disease.
-    2. **Advanced AI-Powered Analysis:** Our machine learning model processes the data using deep learning techniques to detect patterns and identify potential diseases.
-    3. **Instant Results & Recommendations:** View a detailed breakdown of the results, along with potential next steps for medical consultation and treatment.
-
-    ---
-    
-    ## Why Choose Us? 🌟
-    - **🔬 High Accuracy:** Our system leverages advanced machine learning models trained on large medical datasets to ensure precise disease detection.
-    - **🖥️ User-Friendly Interface:** Designed for ease of use, making it accessible for healthcare professionals and general users alike.
-    - **⚡ Fast and Efficient:** Receive results in seconds, enabling prompt decision-making and proactive health management.
-    - **🩺 Multi-Disease Detection:** Detect a range of diseases with a single system, improving diagnostic efficiency and reliability.
-    - **🔒 Secure & Private:** We prioritize user data privacy and security, ensuring that all uploaded medical data is processed securely and not stored.
-
-    ---
-    
-    ## Get Started 🚀
-    Click on the **Any Disease Recognition** page in the sidebar to upload your test results or input relevant data. Experience the power of AI-driven disease detection and take control of your health today!
-    
-    Supported diseases:
-    - ✅ Diabetes Detection
-    - ✅ kidney Detection
-    - ✅ Heart Disease Detection
-    - ✅ More diseases coming soon!
-    
-    ---
-    
-    ## About Us 📖
-    Want to know more about how this system works? Visit the **About** page to explore details about our machine learning models, medical datasets, and research methodologies powering this innovative disease detection platform.
-    
-    **Your health is our priority. Let’s work together to ensure a healthier future! 💙🌍**
-    """)
-
-#About Page
-if(selected=="about"):
-    st.title("About")
-    
-    st.markdown("""
-                ## 🏥 About This Web Application
-                
-                This Web Application is created by **CODEWHIZZKID** to assist in disease prediction using machine learning models trained on various medical datasets. 
-                The application is designed to provide **accurate** 🧠 and **efficient** ⏳ predictions for different diseases based on patient data, enhancing early diagnosis and decision-making.
-
-                ### 📊 About the Dataset
-                The datasets used in this project have been **preprocessed and standardized** 📌 to ensure high accuracy and reliability. 
-                The original datasets have undergone transformations such as **normalization**, **feature scaling**, and **handling missing values** to improve model performance.
-                The dataset is divided into an **80/20 ratio** ⚖️ for training and testing while maintaining the original directory structure.
-
-                ### ⚡ Features of This Application:
-                - 🖥️ **User-Friendly Interface**: Easy navigation and seamless user experience.
-                - 🏥 **Multiple Disease Prediction**: Supports classification for **Diabetes, Heart Disease, kidney Disease**.
-                - 🔍 **Data Standardization & Preprocessing**: Ensures improved model accuracy by handling missing values and normalizing input features.
-                - 🔒 **Secure & Efficient Processing**: Data is processed securely, and results are provided instantly.
-                - 🚀 **Real-Time Predictions**: Users can upload patient data and receive **immediate** predictions based on the trained model.
-
-                ### 📂 Datasets Used:
-                The following datasets have been used in training the models:
-
-                1. **Diabetes Dataset** - [📥 Download](https://www.dropbox.com/scl/fi/0uiujtei423te1q4kvrny/diabetes.csv?rlkey=20xvytca6xbio4vsowi2hdj8e&e=1&dl=0)
-                4. **Heart Disease Dataset** - [📥 Download](https://drive.google.com/file/d/1CEql-OEexf9p02M5vCC1RDLXibHYE9Xz/view)
-                5. **kidney Disease Dataset** - [📥 Download](https://www.kaggle.com/datasets/francismon/curated-colon-dataset-for-deep-learning)
-   
-                ### 🔮 Future Enhancements:
-                - 🔗 Adding more **disease datasets** to expand prediction capabilities.
-                - 🧠 Implementing a **Deep Learning model** to improve accuracy.
-                - 📝 Enabling **real-time patient data input** via forms for better usability.
-
-                This application aims to **leverage machine learning for improving healthcare predictions** and assisting medical professionals in decision-making. ❤️‍🩹
-                """)
-
-#developer 
-if(selected=="developer"):
-    st.title("About Humaira Saifee 👨‍💻")
-    st.header("Your AI & ML Engineer")
-    
-    st.subheader("Meet the Developer")
-    st.write("""
-    Hello, I'm **Humaira Saifee**, your AI and Machine Learning Engineer with 1 years of experience in the field. I am passionate about harnessing the power of technology to make a positive impact on people's lives. Allow me to share a bit about my journey in the world of artificial intelligence and machine learning.
-    """)
-
-    st.subheader("My Expertise")
-    st.write("""
-    With a strong academic background in computer science and a deep fascination for AI and ML, I embarked on a journey that has taken me across the globe, working on diverse and innovative projects. Over the years, I've had the privilege of collaborating on international projects that have pushed the boundaries of what's possible in AI and ML.
-    """)
-
-    st.subheader("A Commitment to Excellence")
-    st.write("""
-    My work is driven by a commitment to excellence and a belief that technology should be accessible and beneficial to everyone. Whether it's developing predictive models, creating intelligent algorithms, or designing user-friendly interfaces, I strive for solutions that are both cutting-edge and user-centric.
-    """)
-
-    st.subheader("Passion for Health Tech")
-    st.write("""
-    The development of **Multiple disease prediction using machine learning** represents a convergence of my passion for AI and my dedication to improving healthcare accessibility. I believe that AI has the potential to transform the way we approach healthcare, making it more personalized and informative. This platform is a testament to that vision.
-    """)
-
-    st.subheader("Join Me on this Journey")
-    st.write("""
-    I invite you to explore **Multiple disease prediction using machine learning** and experience firsthand the fusion of AI and healthcare. Together, we can empower individuals with knowledge, promote well-being, and contribute to a brighter and healthier future.
-    """)
-
-#About Page
-if(selected=="contact us"):
-    st.title("📞 Contact Us")
-    st.write("Have questions or need assistance? We're here to help!")
-
-    st.subheader("Customer Support")
-    st.write("""
-    Our dedicated customer support team is available to assist you with any inquiries or issues you may have. Whether it's a technical question, feedback, or a general inquiry, we're just a message away.
-    """)
-
-    st.subheader("Get in Touch")
-    st.write("""
-    Feel free to reach out to us via email or through the contact form below. We value your feedback and are committed to providing you with the best possible experience.
-    """)
-    st.markdown("📧 **Email:** humairasaifee25@gmail.com")
-    st.markdown("📞 **Phone:** 9152858705")
-
-    st.subheader("Stay Connected")
-    st.write("""
-    Stay up-to-date with the latest news, updates, and health tips by following us on social media. Connect with us on **Facebook** or **Instagram** to join our growing community.
-    """)
-
-    st.subheader("📍 Location")
-    st.write("Mumbai, Maharashtra - 400050")
-
-
-
-
-if selected == 'Diabetes Prediction':
-    st.title("Diabetes Prediction Using Machine Learning")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        Pregnancies = st.text_input("Number of Pregnancies")
-    with col2:
-        Glucose = st.text_input("Glucose Level")
-    with col3:
-        BloodPressure = st.text_input("BloodPressure Value")
-    with col1:
-        SkinThickness = st.text_input("SkinThickness Value")
-    with col2:
-        Insulin = st.text_input("Insulin Value")
-    with col3:
-        BMI = st.text_input("BMI Value")
-    with col1:
-        DiabetesPedigreeFunction = st.text_input("DiabetesPedigreeFunction Value")
-    with col2:
-        Age = st.text_input("Age")
-
-    diabetes_result = ""
-
-    # Check if all inputs are filled before enabling submit
-    all_inputs = [Pregnancies, Glucose, BloodPressure, SkinThickness,
-                  Insulin, BMI, DiabetesPedigreeFunction, Age]
-    
-    if st.button("Diabetes Test Result"):
-        if all(x.strip() != "" for x in all_inputs):
-            # Initialize all derived feature variables
-            NewBMI_Underweight = NewBMI_Overweight = NewBMI_Obesity_1 = 0
-            NewBMI_Obesity_2 = NewBMI_Obesity_3 = 0
-            NewInsulinScore_Normal = 0
-            NewGlucose_Low = NewGlucose_Normal = NewGlucose_Overweight = NewGlucose_Secret = 0
-
-            # BMI categories
-            if float(BMI) <= 18.5:
-                NewBMI_Underweight = 1
-            elif 18.5 < float(BMI) <= 24.9:
-                pass  # Normal BMI
-            elif 24.9 < float(BMI) <= 29.9:
-                NewBMI_Overweight = 1
-            elif 29.9 < float(BMI) <= 34.9:
-                NewBMI_Obesity_1 = 1
-            elif 34.9 < float(BMI) <= 39.9:
-                NewBMI_Obesity_2 = 1
-            elif float(BMI) > 39.9:
-                NewBMI_Obesity_3 = 1
-
-            # Insulin score
-            if 16 <= float(Insulin) <= 166:
-                NewInsulinScore_Normal = 1
-
-            # Glucose levels
-            if float(Glucose) <= 70:
-                NewGlucose_Low = 1
-            elif 70 < float(Glucose) <= 99:
-                NewGlucose_Normal = 1
-            elif 99 < float(Glucose) <= 126:
-                NewGlucose_Overweight = 1
-            elif float(Glucose) > 126:
-                NewGlucose_Secret = 1
-
-            # Final user input for model
-            user_input = [float(Pregnancies), float(Glucose), float(BloodPressure),
-                          float(SkinThickness), float(Insulin), float(BMI),
-                          float(DiabetesPedigreeFunction), float(Age),
-                          NewBMI_Underweight, NewBMI_Overweight, NewBMI_Obesity_1,
-                          NewBMI_Obesity_2, NewBMI_Obesity_3, NewInsulinScore_Normal,
-                          NewGlucose_Low, NewGlucose_Normal, NewGlucose_Overweight,
-                          NewGlucose_Secret]
-
-            prediction = diabetes_model.predict([user_input])
-            if prediction[0] == 1:
-                diabetes_result = "The person is diabetic"
-            else:
-                diabetes_result = "The person is not diabetic"
-        else:
-            st.warning("⚠️ Please fill in all the fields before submitting.")
-
-    st.success(diabetes_result)
-
-# heart disease 
-if selected == 'Heart Disease Prediction':
-    st.title("💓 Heart Disease Prediction Using Machine Learning")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        age = st.text_input("Age")
-    with col2:
-        sex = st.text_input("Sex (0 = Female, 1 = Male)")
-    with col3:
-        cp = st.text_input("Chest Pain Type (0–3)")
-    with col1:
-        trestbps = st.text_input("Resting Blood Pressure (mm Hg)")
-    with col2:
-        chol = st.text_input("Serum Cholesterol (mg/dl)")
-    with col3:
-        fbs = st.text_input("Fasting Blood Sugar > 120 mg/dl (1 = True, 0 = False)")
-    with col1:
-        restecg = st.text_input("Resting ECG (0–2)")
-    with col2:
-        thalach = st.text_input("Maximum Heart Rate Achieved")
-    with col3:
-        exang = st.text_input("Exercise Induced Angina (1 = Yes, 0 = No)")
-    with col1:
-        oldpeak = st.text_input("ST Depression Induced by Exercise")
-    with col2:
-        slope = st.text_input("Slope of Peak Exercise ST Segment (0–2)")
-    with col3:
-        ca = st.text_input("Major Vessels Colored by Fluoroscopy (0–3)")
-    with col1:
-        thal = st.text_input("Thal (1 = Normal, 2 = Fixed Defect, 3 = Reversible Defect)")
-
-    heart_disease_result = ""
-
-    if st.button("Get Heart Disease Prediction"):
-        try:
-            user_input = list(map(float, [
-                age, sex, cp, trestbps, chol, fbs, restecg, thalach,
-                exang, oldpeak, slope, ca, thal
-            ]))
-            prediction = heart_disease_model.predict([user_input])
-            if prediction[0] == 1:
-                heart_disease_result = "🚨 This person **has heart disease.**"
-            else:
-                heart_disease_result = "✅ This person **does not have heart disease.**"
-        except ValueError:
-            st.error("❌ Please enter valid numerical values in all fields.")
-
-    if heart_disease_result:
-        st.success(heart_disease_result)
-
-
-if selected == 'Kidney Disease Prediction':
-    st.title("🧪 Kidney Disease Prediction Using Machine Learning")
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    with col1:
-        age = st.text_input('Age')
-    with col2:
-        blood_pressure = st.text_input('Blood Pressure')
-    with col3:
-        specific_gravity = st.text_input('Specific Gravity')
-    with col4:
-        albumin = st.text_input('Albumin')
-    with col5:
-        sugar = st.text_input('Sugar')
-
-    with col1:
-        red_blood_cells = st.text_input('Red Blood Cells (0 = Normal, 1 = Abnormal)')
-    with col2:
-        pus_cell = st.text_input('Pus Cell (0 = Normal, 1 = Abnormal)')
-    with col3:
-        pus_cell_clumps = st.text_input('Pus Cell Clumps (0 = No, 1 = Yes)')
-    with col4:
-        bacteria = st.text_input('Bacteria (0 = No, 1 = Yes)')
-    with col5:
-        blood_glucose_random = st.text_input('Blood Glucose Random')
-
-    with col1:
-        blood_urea = st.text_input('Blood Urea')
-    with col2:
-        serum_creatinine = st.text_input('Serum Creatinine')
-    with col3:
-        sodium = st.text_input('Sodium')
-    with col4:
-        potassium = st.text_input('Potassium')
-    with col5:
-        hemoglobin = st.text_input('Hemoglobin')
-
-    with col1:
-        packed_cell_volume = st.text_input('Packed Cell Volume')
-    with col2:
-        white_blood_cell_count = st.text_input('White Blood Cell Count')
-    with col3:
-        red_blood_cell_count = st.text_input('Red Blood Cell Count')
-    with col4:
-        hypertension = st.text_input('Hypertension (0 = No, 1 = Yes)')
-    with col5:
-        diabetes_mellitus = st.text_input('Diabetes Mellitus (0 = No, 1 = Yes)')
-
-    with col1:
-        coronary_artery_disease = st.text_input('Coronary Artery Disease (0 = No, 1 = Yes)')
-    with col2:
-        appetite = st.text_input('Appetite (0 = Good, 1 = Poor)')
-    with col3:
-        peda_edema = st.text_input('Pedal Edema (0 = No, 1 = Yes)')
-    with col4:
-        anemia = st.text_input('Anemia (0 = No, 1 = Yes)')
-
-    kidney_disease_result = ""
-
-    if st.button("Get Kidney Disease Prediction"):
-        try:
-            user_input = list(map(float, [
-                age, blood_pressure, specific_gravity, albumin, sugar,
-                red_blood_cells, pus_cell, pus_cell_clumps, bacteria,
-                blood_glucose_random, blood_urea, serum_creatinine, sodium,
-                potassium, hemoglobin, packed_cell_volume,
-                white_blood_cell_count, red_blood_cell_count, hypertension,
-                diabetes_mellitus, coronary_artery_disease, appetite,
-                peda_edema, anemia
-            ]))
-
-            prediction = kidney_disease_model.predict([user_input])
-
-            if prediction[0] == 1:
-                kidney_disease_result = "🚨 This person **has kidney disease.**"
-            else:
-                kidney_disease_result = "✅ This person **does not have kidney disease.**"
-        except ValueError:
-            st.error("❌ Please enter valid numerical values in all fields.")
-
-    if kidney_disease_result:
-        st.success(kidney_disease_result)
-
-
-
-if selected == 'Exit':
-    st.title("Exit Confirmation 🛑")
-    st.write("Are you sure you want to exit now?")
-    
-    st.markdown(
-        """
-        <a href="http://localhost:5501/index.html" target="_self">
-            <button style="background-color: #f44336; color: white; padding: 12px 20px; border: none; border-radius: 8px; font-size: 16px;">
-                ❌ Exit to Homepage
-            </button>
-        </a>
-        """,
-        unsafe_allow_html=True
+    selected = option_menu(
+        "Multiple Disease Prediction",
+        [
+            "Home", "User Login", "Diabetes Prediction",
+            "Heart Disease Prediction", "Kidney Disease Prediction",
+            "Nearby Doctors & Precautions",  # ✅ New
+            "About", "Developer", "Contact Us", "User Graphs", "Exit"
+        ],
+        icons=['house', 'person', 'activity', 'heart', 'person', 'map', 'info-circle',
+               'person-circle', 'envelope', 'bar-chart', 'x-circle'],
+        default_index=0
     )
 
+# ----------------------- Login Check -----------------------
+def check_login():
+    if not st.session_state.get('logged_in'):
+        st.markdown("""
+        <div style="padding:10px; border:1px solid #ccc; border-radius:5px;">
+        Please login first to access prediction tools.
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
+
+# ----------------------- User Login / Signup -----------------------
+if selected == "User Login":
+    st.title("🔐 User Login / Signup")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Login")
+        login_user = st.text_input("Username", key="login_user")
+        login_pass = st.text_input("Password", type="password", key="login_pass")
+        if st.button("Login"):
+            user = get_user(login_user)
+            if user and verify_password(login_pass, user[1]):
+                st.success(f"Welcome, {login_user}! ✅")
+                st.session_state['logged_in'] = True
+                st.session_state['username'] = login_user
+
+                # log login
+                c.execute("INSERT INTO user_activity (username, activity_type, result) VALUES (?, ?, ?)",
+                          (login_user, 'Login', 'Success'))
+                conn.commit()
+            elif user:
+                st.error("Incorrect password ❌")
+            else:
+                st.error("Username not found. Please signup first.")
+
+        if st.session_state.get('logged_in'):
+            if st.button("Logout"):
+                # log logout
+                c.execute("INSERT INTO user_activity (username, activity_type, result) VALUES (?, ?, ?)",
+                          (st.session_state['username'], 'Logout', 'Success'))
+                conn.commit()
+                st.session_state['logged_in'] = False
+                st.session_state['username'] = ""
+                st.success("Logged out successfully.")
+
+    with col2:
+        st.subheader("Create a New Account")
+        new_user = st.text_input("New Username", key="new_user")
+        new_pass = st.text_input("New Password", type="password", key="new_pass")
+        if st.button("Signup"):
+            if not new_user or not new_pass:
+                st.warning("Please enter username and password.")
+            elif get_user(new_user):
+                st.warning("Username already exists. Choose another.")
+            else:
+                add_user(new_user, new_pass)
+                c.execute("INSERT INTO user_activity (username, activity_type, result) VALUES (?, ?, ?)",
+                          (new_user, 'Signup', 'Success'))
+                conn.commit()
+                st.success("Account created successfully! Please login now.")
+
+# ----------------------- Home -----------------------
+if selected == "Home":
+    st.title("🏠 HUMAN MULTIPLE DISEASE DETECTION SYSTEM")
+    st.markdown("""
+    <div style="font-family:'Roboto', sans-serif; line-height:1.6;">
+    <h3>Welcome to the Multiple Disease Prediction System 🔍</h3>
+    <p>This platform helps you detect Diabetes, Heart Disease, and Kidney Disease** early using advanced machine learning models trained on medical datasets.</p>
+    
+    <h4>✅ Supported Diseases:</h4>
+    <ul>
+        <li><b>Diabetes Detection:</b> Analyze your glucose, insulin, BMI, age, and other health parameters.</li>
+        <li><b>Heart Disease Detection:</b> Evaluate heart risk based on blood pressure, cholesterol, ECG, exercise habits, and more.</li>
+        <li><b>Kidney Disease Detection:</b> Assess kidney function using multiple biochemical and physical indicators.</li>
+    </ul>
+
+    <h4>💡 Features:</h4>
+    <ul>
+        <li>User Login & Signup for personalized tracking</li>
+        <li>Prediction results stored in database</li>
+        <li>Nearby doctors & health precautions suggestions</li>
+        <li>User activity graphs and analytics</li>
+    </ul>
+    </div>
+    """, unsafe_allow_html=True)
+# ----------------------- About -----------------------
+if selected == "About":
+    st.title("ℹ️ About This Project")
+    st.markdown("""
+    <div style="font-family:'Roboto', sans-serif; line-height:1.6;">
+    <p>This project, <b>Human Multiple Disease Detection System</b>, is designed to help users detect three major diseases—<b>Diabetes</b>, <b>Heart Disease</b>, and <b>Kidney Disease</b>—at an early stage using <b>machine learning models</b> trained on real medical datasets.</p>
+
+    <h4>🔍 Features:</h4>
+    <ul>
+        <li>Predicts <b>Diabetes</b>, <b>Heart Disease</b>, and <b>Kidney Disease</b> accurately using trained ML models.</li>
+        <li>Provides health precautions for each disease to improve lifestyle and prevent complications.</li>
+        <li>Suggests nearby specialists automatically based on your location.</li>
+        <li>Maintains user login, history of predictions, and analytics of usage.</li>
+        <li>Interactive and user-friendly interface built with <b>Streamlit</b>.</li>
+    </ul>
+
+    <h4>💡 Purpose:</h4>
+    <p>This system is developed to raise awareness about early detection of common diseases and empower users with actionable health insights. It helps both patients and caregivers to monitor health conditions efficiently.</p>
+
+    <h4>🏥 Supported Diseases:</h4>
+    <ul>
+        <li>✅ Diabetes Detection</li>
+        <li>✅ Heart Disease Detection</li>
+        <li>✅ Kidney Disease Detection</li>
+    </ul>
+
+    <p>By integrating <b>AI & ML</b> with healthcare, this project aims to make health monitoring accessible and easy for everyone.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ----------------------- About / Developer -----------------------
+if selected == "Developer":
+    st.title("👨‍💻 About Developer Team")
+    st.markdown("""
+    <div style="font-family:'Roboto', sans-serif; line-height:1.6;">
+    <p>This project is developed by a passionate team of AI & ML enthusiasts focusing on healthcare technology.</p>
+
+    <h4>Team Members:</h4>
+
+    <ul>
+        <li><b>Zaara Khan:</b> Full Stack Developer, responsible for prediction models deployment and API integration. <br>Email: zaarakhn07@eng.rizvi.edu.in</li>
+        <li><b>Anshika Shukla:</b> Frontend & UI/UX Developer, worked on Streamlit interface and visualization. <br>Email: shuklaanshika@eng.rizvi.edu.in</li>
+        <li><b>Sakshi Jha:</b> Backend & Database Developer, responsible for SQLite integration and user management. <br>Email: jhasakshi18@eng.rizvi.edu.in</li>
+        <li><b>Humaira Saifee:</b> Lead AI & ML Engineer, specialized in healthcare predictive models. <br>Email: humairasaifee25@gmail.com</li>
+    </ul>
+    </div>
+    """, unsafe_allow_html=True)
+# ----------------------- Contact -----------------------
+if selected == "Contact Us":
+    st.title("📬 Contact Us")
+    st.markdown("""
+<div style="
+    background-color: #f0f8ff; 
+    padding: 20px; 
+    border-radius: 10px; 
+    color: #1a1a1a; 
+    font-family:'Roboto', sans-serif;
+    line-height:1.6;
+">
+    <h4>📧 Email Addresses:</h4>
+    <ul>
+        <li><b>Zaara Khan:</b> <a href="mailto:zaarakhn07@eng.rizvi.edu.in">zaarakhn07@eng.rizvi.edu.in</a> - Backend & Database Management</li>
+        <li><b>Anshika Shukla:</b> <a href="mailto:shuklaanshika@eng.rizvi.edu.in">shuklaanshika@eng.rizvi.edu.in</a> - Frontend & UI Developer</li>
+        <li><b>Sakshi Jha:</b> <a href="mailto:jhasakshi18@eng.rizvi.edu.in">jhasakshi18@eng.rizvi.edu.in</a> - Team leader</li>
+        <li><b>Humaira Saifee:</b> <a href="mailto:humairasaifee25@gmail.com">humairasaifee25@gmail.com</a> - Machine Learning & AI Specialist</li>
+    </ul>
+</div>
+""", unsafe_allow_html=True)
+
+
+
+# ----------------------- Diabetes Prediction -----------------------
+if selected == "Diabetes Prediction":
+    check_login()
+    st.title("Diabetes Prediction")
+    col1, col2, col3 = st.columns(3)
+    with col1: Pregnancies = st.number_input("Number of Pregnancies", min_value=0)
+    with col2: Glucose = st.number_input("Glucose Level", min_value=0)
+    with col3: BloodPressure = st.number_input("Blood Pressure", min_value=0)
+    with col1: SkinThickness = st.number_input("Skin Thickness", min_value=0)
+    with col2: Insulin = st.number_input("Insulin Level", min_value=0)
+    with col3: BMI = st.number_input("BMI", min_value=0.0, format="%.2f")
+    with col1: DiabetesPedigreeFunction = st.number_input("Diabetes Pedigree Function", min_value=0.0, format="%.3f")
+    with col2: Age = st.number_input("Age", min_value=0)
+
+    if st.button("Predict Diabetes"):
+        input_data = np.array([
+            Pregnancies, Glucose, BloodPressure, SkinThickness,
+            Insulin, BMI, DiabetesPedigreeFunction, Age
+        ]).reshape(1, -1)
+        poly = PolynomialFeatures(degree=2, include_bias=False)
+        input_poly = poly.fit_transform(input_data)[:, :18]
+        prediction = diabetes_model.predict(input_poly)
+        result = "Diabetic" if prediction[0] == 1 else "Non-Diabetic"
+        st.success(f"The person is {result}")
+
+# ----------------------- Heart Disease -----------------------
+if selected == "Heart Disease Prediction":
+    check_login()
+    st.title("Heart Disease Prediction")
+    col1, col2, col3 = st.columns(3)
+    with col1: age = st.number_input("Age", min_value=0)
+    with col2: sex = st.number_input("Sex (1=male,0=female)", min_value=0, max_value=1)
+    with col3: cp = st.number_input("Chest Pain Type (0-3)", min_value=0, max_value=3)
+    with col1: trestbps = st.number_input("Resting Blood Pressure", min_value=0)
+    with col2: chol = st.number_input("Serum Cholesterol", min_value=0)
+    with col3: fbs = st.number_input("Fasting Blood Sugar >120 (1=yes,0=no)", min_value=0, max_value=1)
+    with col1: restecg = st.number_input("Resting ECG (0-2)", min_value=0, max_value=2)
+    with col2: thalach = st.number_input("Max Heart Rate Achieved", min_value=0)
+    with col3: exang = st.number_input("Exercise Induced Angina (1=yes,0=no)", min_value=0, max_value=1)
+    with col1: oldpeak = st.number_input("ST Depression", min_value=0.0, format="%.2f")
+    with col2: slope = st.number_input("Slope of ST segment (1-3)", min_value=1, max_value=3)
+    with col3: ca = st.number_input("Major Vessels (0-3)", min_value=0, max_value=3)
+    with col1: thal = st.number_input("Thalassemia (1=normal,2=fixed,3=reversible)", min_value=1, max_value=3)
+
+    if st.button("Predict Heart Disease"):
+        input_data = [age, sex, cp, trestbps, chol, fbs,
+                      restecg, thalach, exang, oldpeak, slope, ca, thal]
+        prediction = heart_disease_model.predict([input_data])
+        result = "Heart Disease" if prediction[0] == 1 else "No Heart Disease"
+        st.success(f"The person has {result}")
+
+# ----------------------- Kidney Disease -----------------------
+if selected == "Kidney Disease Prediction":
+    check_login()
+    st.title("Kidney Disease Prediction")
+    cols = st.columns(3)
+
+    labels = [
+        "Age", "Blood Pressure", "Specific Gravity", "Albumin", "Sugar",
+        "Red Blood Cells (0/1)", "Pus Cell (0/1)", "Pus Cell Clumps (0/1)", "Bacteria (0/1)",
+        "Blood Glucose Random", "Blood Urea", "Serum Creatinine", "Sodium", "Potassium",
+        "Hemoglobin", "Packed Cell Volume", "White Blood Cell Count", "Red Blood Cell Count",
+        "Hypertension (0/1)", "Diabetes Mellitus (0/1)", "Coronary Artery Disease (0/1)",
+        "Appetite (0=poor,1=good)", "Pedal Edema (0/1)", "Anemia (0/1)"
+    ]
+
+    user_inputs = []
+
+    # Input fields
+    for i, label in enumerate(labels):
+        col = cols[i % 3]
+
+        if "0/1" in label or label in ["Albumin", "Sugar", "Specific Gravity"]:
+            value = col.number_input(label, min_value=0, max_value=100, step=1, key=label)
+        else:
+            value = col.number_input(label, min_value=0.0, step=0.01, format="%.2f", key=label)
+
+        user_inputs.append(value)
+
+    # Prediction button (loop ke baad)
+    if st.button("Predict Kidney Disease"):
+        input_data = [float(x) for x in user_inputs]
+        prediction = kidney_disease_model.predict([input_data])
+        result = "Kidney Disease" if prediction[0] == 1 else "No Kidney Disease"
+        st.success(f"The person has {result}")
+
+# ----------------------- Nearby Doctors & Precautions -----------------------
+if selected == "Nearby Doctors & Precautions":
+    check_login()
+    st.title("🩺 Nearby Doctors & Health Precautions")
+
+    disease = st.selectbox("Select Disease", ["Diabetes", "Heart Disease", "Kidney Disease"])
+
+    precautions = {
+        "Diabetes": [
+            "Eat balanced meals with less sugar.",
+            "Exercise at least 30 minutes daily.",
+            "Check blood sugar levels regularly.",
+            "Avoid junk food and sugary drinks."
+        ],
+        "Heart Disease": [
+            "Avoid smoking and alcohol.",
+            "Eat more fruits and vegetables.",
+            "Control your cholesterol and blood pressure.",
+            "Reduce stress and get enough sleep."
+        ],
+        "Kidney Disease": [
+            "Drink enough water but avoid overhydration.",
+            "Avoid too much salt and protein intake.",
+            "Monitor blood pressure and sugar levels.",
+            "Do not self-medicate with painkillers."
+        ]
+    }
+
+    specialists = {
+        "Diabetes": "Endocrinologist",
+        "Heart Disease": "Cardiologist",
+        "Kidney Disease": "Nephrologist"
+    }
+
+    st.markdown(f"### 🧠 Disease: {disease}")
+    st.markdown(f"**Recommended Specialist:** {specialists[disease]}")
+    st.markdown("#### ✅ Precautions:")
+    for p in precautions[disease]:
+        st.markdown(f"- {p}")
+
+    st.markdown("---")
+
+    # Detect location automatically
+    g = geocoder.ip('me')
+    if g.ok:
+        location = g.city or "your area"
+        st.success(f"📍 Your current location: **{location}**")
+    else:
+        location = "your city"
+        st.warning("Could not detect location automatically.")
+
+    if st.button("🔍 Find Nearby Doctors"):
+        st.info("Fetching doctors near you...")
+
+        GOOGLE_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"  # 🔑 Replace with your API key (optional)
+
+        if GOOGLE_API_KEY != "YOUR_GOOGLE_MAPS_API_KEY":
+            response = requests.get(
+                f"https://maps.googleapis.com/maps/api/place/textsearch/json?query={specialists[disease]}+near+{location}&key={GOOGLE_API_KEY}"
+            )
+            data = response.json()
+            if "results" in data:
+                st.subheader(f"👨‍⚕️ {specialists[disease]}s near {location}:")
+                for place in data["results"][:5]:
+                    st.markdown(f"- **{place['name']}** — {place.get('formatted_address', 'Address not available')}")
+            else:
+                st.warning("No nearby doctors found.")
+        else:
+            st.info(f"🔹 Example doctors near {location}:")
+            dummy_docs = [
+                f"Dr. A. Sharma - {specialists[disease]}",
+                f"Dr. B. Patel - {specialists[disease]}",
+                f"Dr. C. Khan - {specialists[disease]}"
+            ]
+            for doc in dummy_docs:
+                st.markdown(f"- {doc}")
+
+# ----------------------- User Graphs -----------------------
+if selected == "User Graphs":
+    check_login()
+    st.title("📊 User Graphs and Analytics")
+
+    df = pd.read_sql_query("SELECT * FROM user_activity ORDER BY timestamp", conn, parse_dates=['timestamp'])
+    if df.empty:
+        st.info("No activity data yet.")
+    else:
+        st.write("### All Activity Data")
+        st.dataframe(df)
+
+        st.subheader("User Activity Count")
+        activity_counts = df['activity_type'].value_counts()
+        fig1, ax1 = plt.subplots()
+        activity_counts.plot(kind='bar', ax=ax1)
+        ax1.set_xlabel("Activity Type")
+        ax1.set_ylabel("Count")
+        st.pyplot(fig1)
+
+        st.subheader("Prediction Result Distribution")
+        disease_df = df[df['activity_type'].str.contains('Prediction')]
+        if not disease_df.empty:
+            result_counts = disease_df['result'].value_counts()
+            fig2, ax2 = plt.subplots()
+            result_counts.plot(kind='pie', autopct='%1.1f%%', ax=ax2)
+            ax2.set_ylabel('')
+            st.pyplot(fig2)
+        else:
+            st.info("No prediction data yet.")
