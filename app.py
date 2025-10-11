@@ -11,6 +11,12 @@ import json
 import geocoder
 import requests
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # loads values from .env
+api_key = os.getenv("GOOGLE_API_KEY")
+
 import streamlit as st
 
 def highlight_out_of_range(value, min_val, max_val, label):
@@ -21,6 +27,49 @@ def highlight_out_of_range(value, min_val, max_val, label):
     else:
         st.markdown(f"**{label}:** `{value}` ✅ *(Normal)*", unsafe_allow_html=True)
         return "in"
+    
+import requests
+import streamlit as st
+
+def show_nearby_doctors(prediction_label):
+    st.subheader("🏥 Nearby Doctors Recommendation")
+
+    # Example static coordinates (Mumbai)
+    user_lat, user_lng = 19.0760, 72.8777
+    radius = 5000  # meters (5 km)
+    api_key = os.environ.get("GOOGLE_API_KEY")
+
+    # Match specialist based on predicted disease
+    if "heart" in prediction_label.lower():
+        doctor_type = "cardiologist"
+    elif "kidney" in prediction_label.lower():
+        doctor_type = "nephrologist"
+    elif "diabet" in prediction_label.lower():
+        doctor_type = "diabetologist"
+    else:
+        doctor_type = "doctor"
+
+    url = (
+        f"https://maps.googleapis.com/maps/api/place/nearbysearch/json?"
+        f"location={user_lat},{user_lng}&radius={radius}"
+        f"&keyword={doctor_type}&key={api_key}"
+    )
+
+    try:
+        response = requests.get(url)
+        data = response.json()
+
+        if "results" in data and len(data["results"]) > 0:
+            st.markdown(f"**Specialist Type:** {doctor_type.title()}")
+            for place in data["results"][:5]:
+                name = place["name"]
+                address = place.get("vicinity", "Address not available")
+                st.write(f"🩺 **{name}** — {address}")
+        else:
+            st.warning("No nearby doctors found. Try increasing the radius or check your API key.")
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
+
 
 
 # ----------------------- Page Config -----------------------
@@ -261,7 +310,7 @@ with st.sidebar:
         [
             "Home", "User Login", "Diabetes Prediction",
             "Heart Disease Prediction", "Kidney Disease Prediction",
-            "Nearby Doctors & Precautions",  # ✅ New
+            "Precautions",  # ✅ New
             "About", "Developer", "Contact Us", "User Graphs", "Exit"
         ],
         icons=['house', 'person', 'activity', 'heart', 'person', 'map', 'info-circle',
@@ -397,7 +446,7 @@ if selected == "Developer":
     <ul>
         <li><b>Zaara Khan:</b> Full Stack Developer, responsible for prediction models deployment and API integration. <br>Email: zaarakhn07@eng.rizvi.edu.in</li>
         <li><b>Anshika Shukla:</b> Frontend & UI/UX Developer, worked on Streamlit interface and visualization. <br>Email: shuklaanshika@eng.rizvi.edu.in</li>
-        <li><b>Sakshi Jha:</b> Full Stack Developer, responsible for SQLite integration and user management. <br>Email: jhasakshi18@eng.rizvi.edu.in</li>
+        <li><b>Sakshi Jha:</b> Full Stack Developer, API Integrations and Backend logic. <br>Email: jhasakshi18@eng.rizvi.edu.in</li>
         <li><b>Humaira Saifee:</b> Lead AI & ML Engineer, specialized in healthcare predictive models. <br>Email: humairasaifee25@gmail.com</li>
     </ul>
     </div>
@@ -458,6 +507,9 @@ if selected == "Diabetes Prediction":
         highlight_out_of_range(BMI, 18.5, 24.9, "BMI")
         highlight_out_of_range(Age, 18, 60, "Age")
 
+        st.success(f"The person is {result}")
+        show_nearby_doctors("diabetes")
+
 
 # ----------------------- Heart Disease -----------------------
 if selected == "Heart Disease Prediction":
@@ -507,6 +559,9 @@ if selected == "Heart Disease Prediction":
                 st.write(f"- {param}")
         else:
             st.success("✅ All input parameters are within optimal range!")
+        
+        st.success(f"The person is {'Heart Disease' if heart_prediction[0] == 1 else 'Healthy Heart'}")
+        show_nearby_doctors("heart disease")
 
 
 
@@ -570,11 +625,14 @@ if selected == "Kidney Disease Prediction":
         else:
             st.success("✅ All input parameters are within optimal range!")
 
+        st.success(f"The person is {'Kidney Disease' if kidney_prediction[0] == 1 else 'Healthy Kidney'}")
+        show_nearby_doctors("kidney disease")
 
-# ----------------------- Nearby Doctors & Precautions -----------------------
-if selected == "Nearby Doctors & Precautions":
+
+# ----------------------- Precautions -----------------------
+if selected == "Precautions":
     check_login()
-    st.title("🩺 Nearby Doctors & Health Precautions")
+    st.title("⚠️Health Precautions")
 
     disease = st.selectbox("Select Disease", ["Diabetes", "Heart Disease", "Kidney Disease"])
 
