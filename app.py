@@ -30,6 +30,7 @@ def highlight_out_of_range(value, min_val, max_val, label):
     
 import requests
 import streamlit as st
+import os
 
 def show_nearby_doctors(prediction_label):
     st.subheader("🏥 Nearby Doctors Recommendation")
@@ -60,17 +61,81 @@ def show_nearby_doctors(prediction_label):
         data = response.json()
 
         if "results" in data and len(data["results"]) > 0:
-            st.markdown(f"**Specialist Type:** {doctor_type.title()}")
+            st.markdown(f"### 👨‍⚕️ Specialists Found: *{doctor_type.title()}s* Near You")
+            
             for place in data["results"][:5]:
                 name = place["name"]
                 address = place.get("vicinity", "Address not available")
-                st.write(f"🩺 **{name}** — {address}")
+                rating = place.get("rating", "N/A")
+                lat = place["geometry"]["location"]["lat"]
+                lng = place["geometry"]["location"]["lng"]
+                maps_link = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+
+                st.markdown(f"""
+                <div style="
+                    background-color:#f0f8ff;
+                    padding:15px;
+                    margin:10px 0;
+                    border-radius:10px;
+                    box-shadow:0 2px 8px rgba(0,0,0,0.1);
+                ">
+                    <h4 style="margin-bottom:5px;">🩺 {name}</h4>
+                    <p style="margin:0;">📍 {address}</p>
+                    <p style="margin:0;">⭐ Rating: {rating}</p>
+                    <a href="{maps_link}" target="_blank" 
+                       style="color:#0078ff; text-decoration:none;">📍 View on Google Maps</a>
+                </div>
+                """, unsafe_allow_html=True)
         else:
-            st.warning("No nearby doctors found. Try increasing the radius or check your API key.")
+            st.warning("⚠️ No nearby doctors found. Try increasing the radius or check your API key.")
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
+        st.error(f"❌ Error fetching data: {e}")
 
+import matplotlib.pyplot as plt
+import numpy as np
+import streamlit as st
 
+def show_health_summary(values, labels, normal_ranges):
+    st.subheader("📊 Health Summary Chart")
+    fig, ax = plt.subplots(figsize=(10, 6))  # Increased figure size
+    y_pos = np.arange(len(labels))
+    
+    # Determine colors based on normal ranges
+    colors = ['#4CAF50' if normal_ranges[i][0] <= values[i] <= normal_ranges[i][1] 
+              else '#FF5252' for i in range(len(values))]
+    
+    bars = ax.barh(y_pos, values, color=colors)
+    
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(labels)
+    ax.invert_yaxis()  # highest value on top
+    ax.set_xlabel('Value')
+    ax.set_title('Health Parameters Overview')
+    
+    # Calculate appropriate x-axis limit to prevent overlap
+    max_value = max(values)
+    max_range = max([high for low, high in normal_ranges])
+    x_limit = max(max_value, max_range) * 1.4  # Add 40% padding
+    ax.set_xlim(0, x_limit)
+    
+    # Add value and normal range annotations
+    for i, (bar, (low, high)) in enumerate(zip(bars, normal_ranges)):
+        # Display value at the end of the bar
+        ax.text(values[i] + (x_limit * 0.01), i, f"{values[i]}", 
+                va='center', fontsize=10, fontweight='bold')
+        
+        # Display normal range to the right with more spacing
+        range_text = f"(Normal: {low}-{high})"
+        if values[i] < normal_ranges[i][0] or values[i] > normal_ranges[i][1]:
+            color = '#FF5252'
+        else:
+            color = 'gray'
+        
+        ax.text(values[i] + (x_limit * 0.08), i, range_text, 
+                va='center', fontsize=9, color=color)
+    
+    plt.tight_layout()
+    st.pyplot(fig)
 
 # ----------------------- Page Config -----------------------
 st.set_page_config(
@@ -510,6 +575,14 @@ if selected == "Diabetes Prediction":
         st.success(f"The person is {result}")
         show_nearby_doctors("diabetes")
 
+        
+    show_health_summary(
+        [Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI, DiabetesPedigreeFunction, Age],
+        ["Pregnancies", "Glucose", "Blood Pressure", "Skin Thickness", "Insulin", "BMI", "DPF", "Age"],
+        [(0, 5), (70, 140), (60, 120), (10, 40), (15, 166), (18, 25), (0.1, 2.5), (20, 60)]
+    )
+
+
 
 # ----------------------- Heart Disease -----------------------
 if selected == "Heart Disease Prediction":
@@ -562,6 +635,17 @@ if selected == "Heart Disease Prediction":
         
         
         show_nearby_doctors("heart disease")
+
+        show_health_summary(
+        [age, sex, cp, trestbps, chol, fbs,restecg, thalach, exang, oldpeak, slope, ca, thal],
+        ["Age", "Sex", "Chest Pain Type", "Resting BP", "Cholesterol", 
+         "Fasting BS", "Resting ECG", "Max HR", "Exercise Angina", 
+         "Oldpeak", "ST Slope", "Ca", "Thal"],
+        [(18, 65), (0, 1), (0, 1), (90, 120), (125, 200), 
+         (0, 99), (0, 0), (60, 100), (0, 0), 
+         (0, 1.0), (2, 2), (0, 0), (2, 2)]
+    )
+
 
 
 
@@ -626,6 +710,35 @@ if selected == "Kidney Disease Prediction":
             st.success("✅ All input parameters are within optimal range!")
 
         show_nearby_doctors("kidney disease")
+
+    show_health_summary(
+        [
+            user_inputs[0],  # Age
+            user_inputs[1],  # Blood Pressure
+            user_inputs[2],  # Specific Gravity
+            user_inputs[3],  # Albumin
+            user_inputs[4],  # Sugar
+            user_inputs[9],  # Blood Glucose Random
+            user_inputs[10], # Blood Urea
+            user_inputs[11], # Serum Creatinine
+            user_inputs[12], # Sodium
+            user_inputs[13], # Potassium
+            user_inputs[14], # Hemoglobin
+            user_inputs[15], # Packed Cell Volume
+            user_inputs[16], # White Blood Cell Count
+            user_inputs[17], # Red Blood Cell Count
+        ],
+        [
+            "Age", "Blood Pressure", "Specific Gravity", "Albumin", "Sugar", 
+            "Blood Glucose", "Blood Urea", "Serum Creatinine", "Sodium", 
+            "Potassium", "Hemoglobin", "Packed Cell Vol", "WBC Count", "RBC Count"
+        ],
+        [
+            (18, 65), (60, 80), (1.010, 1.025), (0, 0), (0, 0), 
+            (70, 99), (7, 20), (0.6, 1.2), (136, 145), 
+            (3.5, 5.0), (12, 17), (36, 48), (4000, 11000), (4.5, 5.5)
+        ]
+    )
 
 
 # ----------------------- Precautions -----------------------
@@ -710,28 +823,44 @@ if selected == "User Graphs":
     check_login()
     st.title("📊 User Graphs and Analytics")
 
-    df = pd.read_sql_query("SELECT * FROM user_activity ORDER BY timestamp", conn, parse_dates=['timestamp'])
+    try:
+        df = pd.read_sql_query("SELECT * FROM user_activity ORDER BY timestamp", conn, parse_dates=['timestamp'])
+    except Exception as e:
+        st.error(f"Database error: {e}")
+        st.stop()
+
     if df.empty:
         st.info("No activity data yet.")
     else:
-        st.write("### All Activity Data")
+        st.write("### 📋 All Activity Data")
         st.dataframe(df)
 
-        st.subheader("User Activity Count")
-        activity_counts = df['activity_type'].value_counts()
-        fig1, ax1 = plt.subplots()
-        activity_counts.plot(kind='bar', ax=ax1)
-        ax1.set_xlabel("Activity Type")
-        ax1.set_ylabel("Count")
-        st.pyplot(fig1)
+        # Convert timestamp column to datetime
+        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
 
-        st.subheader("Prediction Result Distribution")
-        disease_df = df[df['activity_type'].str.contains('Prediction')]
-        if not disease_df.empty:
+        # -------- Activity Count Bar Graph --------
+        st.subheader("📈 User Activity Count")
+        if 'activity_type' in df.columns:
+            activity_counts = df['activity_type'].value_counts()
+            fig1, ax1 = plt.subplots()
+            activity_counts.plot(kind='bar', ax=ax1, color='skyblue', edgecolor='black')
+            ax1.set_xlabel("Activity Type")
+            ax1.set_ylabel("Count")
+            ax1.set_title("User Activity Distribution")
+            st.pyplot(fig1)
+        else:
+            st.warning("No 'activity_type' column found in data.")
+
+        # -------- Prediction Result Pie Chart --------
+        st.subheader("🩺 Prediction Result Distribution")
+        disease_df = df[df['activity_type'].str.contains('Prediction', case=False, na=False)]
+
+        if not disease_df.empty and 'result' in disease_df.columns:
             result_counts = disease_df['result'].value_counts()
             fig2, ax2 = plt.subplots()
-            result_counts.plot(kind='pie', autopct='%1.1f%%', ax=ax2)
+            result_counts.plot(kind='pie', autopct='%1.1f%%', ax=ax2, startangle=90)
             ax2.set_ylabel('')
+            ax2.set_title("Prediction Results")
             st.pyplot(fig2)
         else:
             st.info("No prediction data yet.")
