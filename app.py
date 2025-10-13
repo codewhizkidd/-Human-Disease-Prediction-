@@ -20,13 +20,72 @@ api_key = os.getenv("GOOGLE_API_KEY")
 import streamlit as st
 
 def highlight_out_of_range(value, min_val, max_val, label):
-    """Highlights if parameter is outside normal range."""
+    """Highlights if parameter is outside normal range with professional styling."""
+    
+    # Determine status
     if value < min_val or value > max_val:
-        st.markdown(f"**{label}:** `{value}` ❌ *(Out of range)*", unsafe_allow_html=True)
-        return "out"
+        status = "out"
+        status_icon = "⚠"
+        status_text = "Out of Range"
+        status_color = "#ff4444"
+        bg_color = "#ffe6e6"
+        border_color = "#ff4444"
     else:
-        st.markdown(f"**{label}:** `{value}` ✅ *(Normal)*", unsafe_allow_html=True)
-        return "in"
+        status = "in"
+        status_icon = "●"
+        status_text = "Normal"
+        status_color = "#00c851"
+        bg_color = "#e8f5e9"
+        border_color = "#00c851"
+    
+    # Create styled component
+    st.markdown(f"""
+    <div style="
+        background: {bg_color};
+        border-left: 5px solid {border_color};
+        border-radius: 8px;
+        padding: 15px 20px;
+        margin: 10px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform 0.2s ease;
+    " onmouseover="this.style.transform='translateX(5px)'" 
+       onmouseout="this.style.transform='translateX(0)'">
+        <div style="flex: 1;">
+            <span style="
+                font-weight: bold;
+                font-size: 1.1em;
+                color: #333;
+            ">{label}:</span>
+            <span style="
+                background: white;
+                padding: 4px 12px;
+                border-radius: 5px;
+                margin-left: 10px;
+                font-family: monospace;
+                font-size: 1.1em;
+                font-weight: bold;
+                color: {status_color};
+            ">{value}</span>
+        </div>
+        <div style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        ">
+            <span style="font-size: 1.3em;">{status_icon}</span>
+            <span style="
+                color: {status_color};
+                font-weight: 600;
+                font-size: 0.95em;
+            ">{status_text}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    return status
     
 import requests
 import streamlit as st
@@ -375,10 +434,10 @@ with st.sidebar:
         [
             "Home", "User Login", "Diabetes Prediction",
             "Heart Disease Prediction", "Kidney Disease Prediction",
-            "Precautions",  # ✅ New
+            "Precautions",  
             "About", "Developer", "Contact Us", "User Graphs", "Exit"
         ],
-        icons=['house', 'person', 'activity', 'heart', 'person', 'map', 'info-circle',
+        icons=['house', 'person', 'capsule', 'heart', 'droplet', 'map', 'info-circle',
                'person-circle', 'envelope', 'bar-chart', 'x-circle'],
         default_index=0
     )
@@ -387,62 +446,201 @@ with st.sidebar:
 def check_login():
     if not st.session_state.get('logged_in'):
         st.markdown("""
-        <div style="padding:10px; border:1px solid #ccc; border-radius:5px;">
-        Please login first to access prediction tools.
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    padding: 20px; border-radius: 10px; color: white; text-align: center;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h3>🔒 Authentication Required</h3>
+            <p>Please login first to access prediction tools.</p>
         </div>
         """, unsafe_allow_html=True)
         st.stop()
 
 # ----------------------- User Login / Signup -----------------------
 if selected == "User Login":
-    st.title("🔐 User Login / Signup")
-    col1, col2 = st.columns(2)
+    # Custom CSS for styling
+    st.markdown("""
+    <style>
+    .login-header {
+        text-align: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    }
+    .login-header h1 {
+        margin: 0;
+        font-size: 2.5em;
+        font-weight: bold;
+    }
+    .login-header p {
+        margin: 10px 0 0 0;
+        font-size: 1.1em;
+        opacity: 0.9;
+    }
+    
+    }
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+                
+    }
+    .success-message {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin: 15px 0;
+        font-weight: bold;
+        animation: slideIn 0.5s ease;
+    }
+    .error-message {
+        background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin: 15px 0;
+        font-weight: bold;
+        animation: shake 0.5s ease;
+    }
+    .warning-message {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        text-align: center;
+        margin: 15px 0;
+        font-weight: bold;
+    }
+    @keyframes slideIn {
+        from { transform: translateX(-100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+    }
+    
+    
+    .feature-box {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 20px;
+        border-radius: 10px;
+        margin-top: 20px;
+        text-align: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
+    # Header
+    st.markdown("""
+    <div class="login-header">
+        <h1>🔐 Welcome Back!</h1>
+        <p>Access your personalized health prediction dashboard</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2, gap="large")
+    
     with col1:
-        st.subheader("Login")
-        login_user = st.text_input("Username", key="login_user")
-        login_pass = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Login"):
-            user = get_user(login_user)
-            if user and verify_password(login_pass, user[1]):
-                st.success(f"Welcome, {login_user}! ✅")
-                st.session_state['logged_in'] = True
-                st.session_state['username'] = login_user
-
-                # log login
-                c.execute("INSERT INTO user_activity (username, activity_type, result) VALUES (?, ?, ?)",
-                          (login_user, 'Login', 'Success'))
-                conn.commit()
-            elif user:
-                st.error("Incorrect password ❌")
-            else:
-                st.error("Username not found. Please signup first.")
-
+        st.markdown('<div', unsafe_allow_html=True)
+        st.markdown('<h3>🔑 Login to Your Account</h3>', unsafe_allow_html=True)
+        
+        login_user = st.text_input("Username", key="login_user", placeholder="Enter your username")
+        login_pass = st.text_input("Password", type="password", key="login_pass", placeholder="Enter your password")
+        
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("🚀 Login", use_container_width=True, type="primary"):
+                user = get_user(login_user)
+                if user and verify_password(login_pass, user[1]):
+                    st.markdown(f'<div class="success-message">✅ Welcome back, {login_user}!</div>', unsafe_allow_html=True)
+                    st.session_state['logged_in'] = True
+                    st.session_state['username'] = login_user
+                    
+                    # log login
+                    c.execute("INSERT INTO user_activity (username, activity_type, result) VALUES (?, ?, ?)",
+                              (login_user, 'Login', 'Success'))
+                    conn.commit()
+                    st.balloons()
+                elif user:
+                    st.markdown('<div class="error-message">❌ Incorrect password. Please try again.</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="error-message">❌ Username not found. Please signup first.</div>', unsafe_allow_html=True)
+        
+        with col_btn2:
+            if st.session_state.get('logged_in'):
+                if st.button("🚪 Logout", use_container_width=True):
+                    # log logout
+                    c.execute("INSERT INTO user_activity (username, activity_type, result) VALUES (?, ?, ?)",
+                              (st.session_state['username'], 'Logout', 'Success'))
+                    conn.commit()
+                    st.session_state['logged_in'] = False
+                    st.session_state['username'] = ""
+                    st.markdown('<div class="success-message">👋 Logged out successfully!</div>', unsafe_allow_html=True)
+        
         if st.session_state.get('logged_in'):
-            if st.button("Logout"):
-                # log logout
-                c.execute("INSERT INTO user_activity (username, activity_type, result) VALUES (?, ?, ?)",
-                          (st.session_state['username'], 'Logout', 'Success'))
-                conn.commit()
-                st.session_state['logged_in'] = False
-                st.session_state['username'] = ""
-                st.success("Logged out successfully.")
-
+            st.markdown(f"""
+            <div class="feature-box">
+                <h4>👤 Logged in as: <strong>{st.session_state['username']}</strong></h4>
+                <p>You now have access to all prediction tools!</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
     with col2:
-        st.subheader("Create a New Account")
-        new_user = st.text_input("New Username", key="new_user")
-        new_pass = st.text_input("New Password", type="password", key="new_pass")
-        if st.button("Signup"):
+        st.markdown('<div>', unsafe_allow_html=True)
+        st.markdown('<h3>✨ Create New Account</h3>', unsafe_allow_html=True)
+        
+        new_user = st.text_input("New Username", key="new_user", placeholder="Choose a unique username")
+        new_pass = st.text_input("New Password", type="password", key="new_pass", placeholder="Create a strong password")
+        
+        if st.button("🎉 Create Account", use_container_width=True, type="primary"):
             if not new_user or not new_pass:
-                st.warning("Please enter username and password.")
+                st.markdown('<div class="warning-message">⚠️ Please enter both username and password.</div>', unsafe_allow_html=True)
             elif get_user(new_user):
-                st.warning("Username already exists. Choose another.")
+                st.markdown('<div class="warning-message">⚠️ Username already exists. Choose another one.</div>', unsafe_allow_html=True)
             else:
                 add_user(new_user, new_pass)
                 c.execute("INSERT INTO user_activity (username, activity_type, result) VALUES (?, ?, ?)",
                           (new_user, 'Signup', 'Success'))
                 conn.commit()
-                st.success("Account created successfully! Please login now.")
+                st.markdown('<div class="success-message">🎊 Account created successfully! Please login now.</div>', unsafe_allow_html=True)
+                st.snow()
+        
+        st.markdown("""
+        <div class="feature-box">
+            <h4>🌟 Why Create an Account?</h4>
+            <div style="display: flex; justify-content: space-around; margin-top: 10px;">
+                <span>✓ Save predictions</span>
+                <span>✓ Track history</span>
+            </div>
+            <div style="display: flex; justify-content: space-around; margin-top: 8px;">
+                <span>✓ Get insights</span>
+                <span>✓ Secure data</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="text-align: center; padding: 20px; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); 
+                border-radius: 15px; margin-top: 20px;">
+        <h3>🏥 Advanced Health Prediction System</h3>
+        <p>Our AI-powered platform provides predictions for multiple diseases including:</p>
+        <p><strong>💉 Diabetes</strong> • <strong>❤️ Heart Disease</strong> • <strong>🩺 Kidney Disease</strong></p>
+        <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.8;">
+            Secure • Accurate • Confidential
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ----------------------- Home -----------------------
 if selected == "Home":
@@ -775,7 +973,7 @@ if selected == "Precautions":
         "Kidney Disease": "Nephrologist"
     }
 
-    st.markdown(f"### 🧠 Disease: {disease}")
+    st.markdown(f"### 💉 Disease: {disease}")
     st.markdown(f"**Recommended Specialist:** {specialists[disease]}")
     st.markdown("#### ✅ Precautions:")
     for p in precautions[disease]:
