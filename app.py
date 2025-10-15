@@ -268,7 +268,8 @@ page_bg_color = """
 
 /* ------------------- Main App Background ------------------- */
 .stApp {
-    background: linear-gradient(135deg, #c3ecff 0%, #b3f0ff 100%);
+    background: linear-gradient(135deg, #d9fdd3, #a6e3e9, #71c9ce);
+        background-attachment: fixed;
     color: #1a1a1a;
     font-family: 'Roboto', sans-serif;
     transition: all 0.5s ease;
@@ -338,7 +339,7 @@ h1, h2, h3, h4, h5, h6 {
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input {
     color: #333333 !important;
-    background-color: #e0f7fa !important;
+    background-color: #0a0a0a !important;
     border: 1px solid #0099cc !important;
     border-radius: 10px !important;
     padding: 8px;
@@ -435,7 +436,7 @@ with st.sidebar:
             "Home", "User Login", "Diabetes Prediction",
             "Heart Disease Prediction", "Kidney Disease Prediction",
             "Precautions",  
-            "About", "Developer", "Contact Us", "User Graphs", "Exit"
+            "About", "Contact Us", "User Graphs", "Exit"
         ],
         icons=['house', 'person', 'capsule', 'heart', 'droplet', 'map', 'info-circle',
                'person-circle', 'envelope', 'bar-chart', 'x-circle'],
@@ -697,23 +698,6 @@ if selected == "About":
     """, unsafe_allow_html=True)
 
 
-# ----------------------- About / Developer -----------------------
-if selected == "Developer":
-    st.title("👨‍💻 About Developer Team")
-    st.markdown("""
-    <div style="font-family:'Roboto', sans-serif; line-height:1.6;">
-    <p>This project is developed by a passionate team of AI & ML enthusiasts focusing on healthcare technology.</p>
-
-    <h4>Team Members:</h4>
-
-    <ul>
-        <li><b>Zaara Khan:</b> Full Stack Developer, responsible for prediction models deployment and API integration. <br>Email: zaarakhn07@eng.rizvi.edu.in</li>
-        <li><b>Anshika Shukla:</b> Frontend & UI/UX Developer, worked on Streamlit interface and visualization. <br>Email: shuklaanshika@eng.rizvi.edu.in</li>
-        <li><b>Sakshi Jha:</b> Full Stack Developer, API Integrations and Backend logic. <br>Email: jhasakshi18@eng.rizvi.edu.in</li>
-        <li><b>Humaira Saifee:</b> Lead AI & ML Engineer, specialized in healthcare predictive models. <br>Email: humairasaifee25@gmail.com</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
 # ----------------------- Contact -----------------------
 if selected == "Contact Us":
     st.title("📬 Contact Us")
@@ -730,7 +714,7 @@ if selected == "Contact Us":
     <ul>
         <li><b>Zaara Khan:</b> <a href="mailto:zaarakhn07@eng.rizvi.edu.in">zaarakhn07@eng.rizvi.edu.in</a> - Backend & Database Management</li>
         <li><b>Anshika Shukla:</b> <a href="mailto:shuklaanshika@eng.rizvi.edu.in">shuklaanshika@eng.rizvi.edu.in</a> - Frontend & UI Developer</li>
-        <li><b>Sakshi Jha:</b> <a href="mailto:jhasakshi18@eng.rizvi.edu.in">jhasakshi18@eng.rizvi.edu.in</a> - Team leader</li>
+        <li><b>Sakshi Jha:</b> <a href="mailto:jhasakshi18@eng.rizvi.edu.in">jhasakshi18@eng.rizvi.edu.in</a> - API Integration and Performance optimization [Team leader]</li>
         <li><b>Humaira Saifee:</b> <a href="mailto:humairasaifee25@gmail.com">humairasaifee25@gmail.com</a> - Machine Learning & AI Specialist</li>
     </ul>
 </div>
@@ -1030,35 +1014,70 @@ if selected == "User Graphs":
     if df.empty:
         st.info("No activity data yet.")
     else:
-        st.write("### 📋 All Activity Data")
-        st.dataframe(df)
+        # ✅ Filter out non-disease activities
+        disease_keywords = ['diabetes', 'heart', 'kidney']
+        disease_df = df[df['activity_type'].str.lower().str.contains('|'.join(disease_keywords), na=False)]
 
-        # Convert timestamp column to datetime
-        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+        if disease_df.empty:
+            st.info("No disease prediction data yet.")
+            st.stop()
 
-        # -------- Activity Count Bar Graph --------
-        st.subheader("📈 User Activity Count")
-        if 'activity_type' in df.columns:
-            activity_counts = df['activity_type'].value_counts()
-            fig1, ax1 = plt.subplots()
-            activity_counts.plot(kind='bar', ax=ax1, color='skyblue', edgecolor='black')
-            ax1.set_xlabel("Activity Type")
-            ax1.set_ylabel("Count")
-            ax1.set_title("User Activity Distribution")
-            st.pyplot(fig1)
-        else:
-            st.warning("No 'activity_type' column found in data.")
+        disease_df['timestamp'] = pd.to_datetime(disease_df['timestamp'], errors='coerce')
 
-        # -------- Prediction Result Pie Chart --------
-        st.subheader("🩺 Prediction Result Distribution")
-        disease_df = df[df['activity_type'].str.contains('Prediction', case=False, na=False)]
+        # ✅ Optional: Admin-only access to raw data
+        with st.expander("📋 View Raw Activity Data (Admin Only)"):
+            if st.session_state.get('username') == "admin":
+                st.dataframe(disease_df)
+            else:
+                st.warning("You don’t have permission to view this data.")
 
-        if not disease_df.empty and 'result' in disease_df.columns:
+        st.markdown("### 🩺 Disease Prediction Overview")
+
+        # ✅ Count of predictions per disease type
+        st.subheader("📈 Predictions per Disease Type")
+        prediction_counts = (
+            disease_df['activity_type']
+            .replace({
+                'Diabetes Prediction': 'Diabetes',
+                'Heart Prediction': 'Heart Disease',
+                'Kidney Disease Prediction': 'Kidney Disease'
+            })
+            .value_counts()
+            .reindex(['Diabetes', 'Heart Disease', 'Kidney Disease'], fill_value=0)
+        )
+
+        fig1, ax1 = plt.subplots()
+        prediction_counts.plot(kind='bar', ax=ax1, color=['#2B7A78', '#3AAFA9', '#17252A'], edgecolor='black')
+        ax1.set_xlabel("Disease Type")
+        ax1.set_ylabel("Number of Predictions")
+        ax1.set_title("Disease-wise Prediction Count")
+        st.pyplot(fig1)
+
+        # ✅ Prediction results pie chart
+        st.subheader("🎯 Prediction Result Distribution")
+        if 'result' in disease_df.columns:
             result_counts = disease_df['result'].value_counts()
             fig2, ax2 = plt.subplots()
-            result_counts.plot(kind='pie', autopct='%1.1f%%', ax=ax2, startangle=90)
+            result_counts.plot(kind='pie', autopct='%1.1f%%', startangle=90, ax=ax2, colors=['#3AAFA9', '#DEF2F1'])
             ax2.set_ylabel('')
-            ax2.set_title("Prediction Results")
+            ax2.set_title("Prediction Outcomes")
             st.pyplot(fig2)
-        else:
-            st.info("No prediction data yet.")
+
+        # ✅ Prediction trend over time
+        st.subheader("📅 Prediction Activity Over Time")
+        time_df = disease_df.copy()
+        time_df['date'] = time_df['timestamp'].dt.date
+        daily_counts = time_df.groupby('date').size()
+        fig3, ax3 = plt.subplots()
+        daily_counts.plot(kind='line', ax=ax3, marker='o', color='#17252A')
+        ax3.set_xlabel("Date")
+        ax3.set_ylabel("Predictions Made")
+        ax3.set_title("Prediction Trend Over Time")
+        st.pyplot(fig3)
+
+        # ✅ Dashboard summary metrics
+        st.markdown("### 📊 Summary Statistics")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Predictions", len(disease_df))
+        col2.metric("Unique Users", disease_df['username'].nunique())
+        col3.metric("Diseases Covered", prediction_counts[prediction_counts > 0].count())
