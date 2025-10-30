@@ -449,7 +449,7 @@ def show_modern_graph(values, labels, normal_ranges):
     st.pyplot(fig)
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ===================== HIGHLIGHT ABNORMAL PARAMETERS =====================
+# ===================== ORIGINAL FUNCTIONS (KEPT INTACT) =====================
 def highlight_out_of_range(value, min_val, max_val, label):
     """Original function - kept for compatibility"""
     if value < min_val or value > max_val:
@@ -789,7 +789,7 @@ if selected == "Diabetes Prediction":
         
         show_modern_result(f"The person is {result}", "diabetes")
         
-        st.markdown("### Health Indicators")
+        st.markdown("### 🩺 Health Indicators")
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             status = "normal" if 70 <= Glucose <= 140 else "abnormal"
@@ -848,7 +848,7 @@ if selected == "Heart Disease Prediction":
         
         show_modern_result(f"The person has {result}", "heart")
         
-        st.markdown("### Health Indicators")
+        st.markdown("### 🩺 Health Indicators")
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             status = "normal" if 18 <= age <= 65 else "abnormal"
@@ -881,155 +881,66 @@ if selected == "Kidney Disease Prediction":
     
     show_greeting_card(st.session_state['username'])
     
-    st.title(" Kidney Disease Prediction")
+    st.title("Kidney Disease Prediction")
     
     st.markdown('<div class="input-section">', unsafe_allow_html=True)
     st.markdown("### Enter Health Parameters")
     
     cols = st.columns(3)
     
-    # Numeric inputs
-    with cols[0]: age = st.number_input("Age", min_value=0, step=1)
-    with cols[1]: bp = st.number_input("Blood Pressure", min_value=0, step=1)
-    with cols[2]: sg = st.number_input("Specific Gravity", min_value=1.000, max_value=1.030, step=0.001, format="%.3f", value=1.020)
-    with cols[0]: al = st.number_input("Albumin", min_value=0, max_value=5, step=1)
-    with cols[1]: su = st.number_input("Sugar", min_value=0, max_value=5, step=1)
+    labels = [
+        "Age", "Blood Pressure", "Specific Gravity", "Albumin", "Sugar",
+        "Red Blood Cells (0/1)", "Pus Cell (0/1)", "Pus Cell Clumps (0/1)", "Bacteria (0/1)",
+        "Blood Glucose Random", "Blood Urea", "Serum Creatinine", "Sodium", "Potassium",
+        "Hemoglobin", "Packed Cell Volume", "White Blood Cell Count", "Red Blood Cell Count",
+        "Hypertension (0/1)", "Diabetes Mellitus (0/1)", "Coronary Artery Disease (0/1)",
+        "Appetite (0=poor,1=good)", "Pedal Edema (0/1)", "Anemia (0/1)"
+    ]
     
-    # Categorical inputs using radio buttons in horizontal layout
-    with cols[2]: 
-        st.write("**Red Blood Cells**")
-        rbc = st.radio("rbc_label", ["normal", "abnormal"], horizontal=True, label_visibility="collapsed", key="rbc")
+    user_inputs = []
     
-    with cols[0]: 
-        st.write("**Pus Cell**")
-        pc = st.radio("pc_label", ["normal", "abnormal"], horizontal=True, label_visibility="collapsed", key="pc")
-    
-    with cols[1]: 
-        st.write("**Pus Cell Clumps**")
-        pcc = st.radio("pcc_label", ["notpresent", "present"], horizontal=True, label_visibility="collapsed", key="pcc")
-    
-    with cols[2]: 
-        st.write("**Bacteria**")
-        ba = st.radio("ba_label", ["notpresent", "present"], horizontal=True, label_visibility="collapsed", key="ba")
-    
-    # More numeric inputs
-    with cols[0]: bgr = st.number_input("Blood Glucose Random", min_value=0.0, step=0.1)
-    with cols[1]: bu = st.number_input("Blood Urea", min_value=0.0, step=0.1)
-    with cols[2]: sc = st.number_input("Serum Creatinine", min_value=0.0, step=0.1, format="%.2f")
-    with cols[0]: sod = st.number_input("Sodium", min_value=0.0, step=0.1)
-    with cols[1]: pot = st.number_input("Potassium", min_value=0.0, step=0.1, format="%.2f")
-    with cols[2]: hemo = st.number_input("Hemoglobin", min_value=0.0, step=0.1)
-    with cols[0]: pcv = st.number_input("Packed Cell Volume", min_value=0, step=1)
-    with cols[1]: wc = st.number_input("White Blood Cell Count", min_value=0, step=100)
-    with cols[2]: rc = st.number_input("Red Blood Cell Count", min_value=0.0, step=0.1)
-    
-    # More categorical inputs using radio buttons
-    with cols[0]: 
-        st.write("**Hypertension**")
-        htn = st.radio("htn_label", ["no", "yes"], horizontal=True, label_visibility="collapsed", key="htn")
-    
-    with cols[1]: 
-        st.write("**Diabetes Mellitus**")
-        dm = st.radio("dm_label", ["no", "yes"], horizontal=True, label_visibility="collapsed", key="dm")
-    
-    with cols[2]: 
-        st.write("**Coronary Artery Disease**")
-        cad = st.radio("cad_label", ["no", "yes"], horizontal=True, label_visibility="collapsed", key="cad")
-    
-    with cols[0]: 
-        st.write("**Appetite**")
-        appet = st.radio("appet_label", ["good", "poor"], horizontal=True, label_visibility="collapsed", key="appet")
-    
-    with cols[1]: 
-        st.write("**Pedal Edema**")
-        pe = st.radio("pe_label", ["no", "yes"], horizontal=True, label_visibility="collapsed", key="pe")
-    
-    with cols[2]: 
-        st.write("**Anemia**")
-        ane = st.radio("ane_label", ["no", "yes"], horizontal=True, label_visibility="collapsed", key="ane")
+    for i, label in enumerate(labels):
+        col = cols[i % 3]
+        
+        if "0/1" in label or label in ["Albumin", "Sugar", "Specific Gravity"]:
+            value = col.number_input(label, min_value=0, max_value=100, step=1, key=label)
+        else:
+            value = col.number_input(label, min_value=0.0, step=0.01, format="%.2f", key=label)
+        
+        user_inputs.append(value)
     
     st.markdown('</div>', unsafe_allow_html=True)
     
     if st.button("🔍 Predict Kidney Disease", use_container_width=True):
-        # Risk-based prediction logic
-        risk = 0
-        alerts = []
+        input_data = [float(x) for x in user_inputs]
+        prediction = kidney_disease_model.predict([input_data])
+        result = "Kidney Disease" if prediction[0] == 1 else "No Kidney Disease"
         
-        # Numeric thresholds
-        if bp > 140: risk += 1; alerts.append("High Blood Pressure")
-        if sg < 1.015: risk += 1; alerts.append("Low Urine Specific Gravity")
-        if al > 1: risk += 1; alerts.append("Protein in Urine (Albumin)")
-        if su > 1: risk += 1; alerts.append("Sugar in Urine")
-        if bgr > 150: risk += 1; alerts.append("High Blood Glucose")
-        if bu > 20: risk += 1; alerts.append("High Blood Urea")
-        if sc > 1.2: risk += 1; alerts.append("High Serum Creatinine")
-        if sod < 135: risk += 1; alerts.append("Low Sodium Level")
-        if pot > 5.0: risk += 1; alerts.append("High Potassium Level")
-        if hemo < 12: risk += 1; alerts.append("Low Hemoglobin")
-        if pcv < 36: risk += 1; alerts.append("Low Packed Cell Volume")
-        if wc > 11000: risk += 1; alerts.append("High WBC Count")
-        if rc < 4.2: risk += 1; alerts.append("Low RBC Count")
+        show_modern_result(f"The person has {result}", "kidney")
         
-        # Categorical rules
-        if rbc == "abnormal": risk += 1; alerts.append("Abnormal RBC")
-        if pc == "abnormal": risk += 1; alerts.append("Abnormal Pus Cells")
-        if pcc == "present": risk += 1; alerts.append("Pus Cell Clumps Present")
-        if ba == "present": risk += 1; alerts.append("Bacteria in Urine")
-        if htn == "yes": risk += 1; alerts.append("Hypertension")
-        if dm == "yes": risk += 1; alerts.append("Diabetes Mellitus")
-        if cad == "yes": risk += 1; alerts.append("Coronary Artery Disease")
-        if appet == "poor": risk += 1; alerts.append("Poor Appetite")
-        if pe == "yes": risk += 1; alerts.append("Pedal Edema")
-        if ane == "yes": risk += 1; alerts.append("Anemia")
-        
-        # Final Decision
-        if risk >= 4:
-            result = "Kidney Disease"
-            show_modern_result(f"⚠️ High Risk of Chronic Kidney Disease! (Risk Score: {risk})", "kidney")
-            st.markdown("### 🚨 Abnormal Findings:")
-            for alert in alerts:
-                st.markdown(f"""
-                <div style="background: #fff5f5; padding: 0.8rem; margin: 0.5rem 0; 
-                            border-left: 4px solid #f56565; border-radius: 8px; color: #c53030;">
-                    • {alert}
-                </div>
-                """, unsafe_allow_html=True)
-        elif risk == 2 or risk == 3:
-            result = "Moderate Risk"
-            show_modern_result(f"⚠️ Moderate Risk. Medical checkup recommended. (Risk Score: {risk})", "kidney")
-            st.markdown("### ⚠️ Possible Concerns:")
-            for alert in alerts:
-                st.markdown(f"""
-                <div style="background: #fffbeb; padding: 0.8rem; margin: 0.5rem 0; 
-                            border-left: 4px solid #f59e0b; border-radius: 8px; color: #92400e;">
-                    • {alert}
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            result = "No Kidney Disease"
-            show_modern_result(f"✅ Likely No Kidney Disease (Risk Score: {risk})", "kidney")
-            st.success("Health parameters appear normal ✅")
-        
-        # Health Indicators
         st.markdown("### 🩺 Health Indicators")
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            status = "normal" if 60 <= bp <= 80 else "abnormal"
-            show_metric_card("Blood Pressure", bp, "mmHg", status)
+            status = "normal" if 60 <= user_inputs[1] <= 80 else "abnormal"
+            show_metric_card("Blood Pressure", user_inputs[1], "mmHg", status)
         with col2:
-            status = "normal" if 0.6 <= sc <= 1.2 else "abnormal"
-            show_metric_card("Creatinine", sc, "mg/dL", status)
+            status = "normal" if 0.6 <= user_inputs[11] <= 1.2 else "abnormal"
+            show_metric_card("Creatinine", user_inputs[11], "mg/dL", status)
         with col3:
-            status = "normal" if 7 <= bu <= 20 else "abnormal"
-            show_metric_card("Blood Urea", bu, "mg/dL", status)
+            status = "normal" if 7 <= user_inputs[10] <= 20 else "abnormal"
+            show_metric_card("Blood Urea", user_inputs[10], "mg/dL", status)
         with col4:
-            status = "normal" if 12 <= hemo <= 17 else "abnormal"
-            show_metric_card("Hemoglobin", hemo, "g/dL", status)
+            status = "normal" if 12 <= user_inputs[14] <= 17 else "abnormal"
+            show_metric_card("Hemoglobin", user_inputs[14], "g/dL", status)
         
         show_modern_doctors("kidney disease")
         
         show_modern_graph(
-            [age, bp, sg, al, su, bgr, bu, sc, sod, pot, hemo, pcv, wc, rc],
+            [
+                user_inputs[0], user_inputs[1], user_inputs[2], user_inputs[3], user_inputs[4],
+                user_inputs[9], user_inputs[10], user_inputs[11], user_inputs[12], user_inputs[13],
+                user_inputs[14], user_inputs[15], user_inputs[16], user_inputs[17]
+            ],
             [
                 "Age", "Blood Pressure", "Specific Gravity", "Albumin", "Sugar", 
                 "Blood Glucose", "Blood Urea", "Serum Creatinine", "Sodium", 
@@ -1051,7 +962,7 @@ if selected == "Precautions":
     st.title("🛡️ Health Precautions & Lifestyle Guide")
     
     # Disease selection with better styling
-    st.markdown("### Select Disease Type")
+    st.markdown("### 📋 Select Disease Type")
     disease = st.selectbox("Choose a disease to view personalized health recommendations", 
                            ["Diabetes", "Heart Disease", "Kidney Disease"],
                            label_visibility="collapsed")
@@ -1340,13 +1251,13 @@ if selected == "User Graphs":
         disease_df['timestamp'] = pd.to_datetime(disease_df['timestamp'], errors='coerce')
         
         # ✅ Optional: Admin-only access to raw data
-        with st.expander("View Raw Activity Data (Admin Only)"):
+        with st.expander("📋 View Raw Activity Data (Admin Only)"):
             if st.session_state.get('username') == "admin":
                 st.dataframe(disease_df)
             else:
                 st.warning("You don't have permission to view this data.")
         
-        st.markdown("### Disease Prediction Overview")
+        st.markdown("### 🩺 Disease Prediction Overview")
         
         # ✅ Count of predictions per disease type
         st.subheader("📈 Predictions per Disease Type")
